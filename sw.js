@@ -1,4 +1,4 @@
-const CACHE = 'shiti-iphone-0898c22d1ab7';
+const CACHE = 'shiti-iphone-9acab0f1e29d';
 const FILES = ['./', './index.html', './styles.css', './app.js', './app-config.js', './pwa.js', './core.js', './storage.js', './sync-client.js', './document-export.js', './vendor/lucide.js', './vendor/docx.js', './manifest.webmanifest', './assets/icon-192.png', './assets/icon-512.png'];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES))); });
 self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('shiti-') && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim())); });

@@ -14,10 +14,12 @@ export function validateBackup(data) {
   return data.items.map(x => {
     if (!x || typeof x.id !== 'string' || !x.id || x.id.length > 100 || ids.has(x.id) || !SUBJECTS.includes(x.subject)) throw new Error('备份中的题目数据不完整');
     ids.add(x.id);
-    for (const key of ['title', 'question', 'answer', 'reason', 'tags']) if (typeof x[key] !== 'string' || x[key].length > 20000) throw new Error('备份文本格式不正确');
+    for (const key of ['title', 'question', 'answer', 'correctAnswer', 'reason', 'tags']) if (typeof (x[key] ?? '') !== 'string' || (x[key] ?? '').length > 20000) throw new Error('备份文本格式不正确');
     for (const key of ['createdAt', 'updatedAt', 'nextReview']) if (!Number.isFinite(x[key]) || x[key] < 0 || x[key] > 8640000000000000) throw new Error('备份日期格式不正确');
     if (!Array.isArray(x.photos) || x.photos.length > 8 || x.photos.some(p => typeof p !== 'string' || !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(p) || p.length > 16000000)) throw new Error('备份图片格式不正确');
-    if (!x.title.trim() || (!x.photos.length && !x.question.trim())) throw new Error('备份题目缺少内容');
-    return { id: x.id, subject: x.subject, title: x.title, question: x.question, answer: x.answer, reason: x.reason, tags: x.tags, photos: x.photos, createdAt: x.createdAt, updatedAt: x.updatedAt, nextReview: x.nextReview, mastered: x.mastered === true, starred: x.starred === true, level: Math.max(0, Math.min(5, Number(x.level) || 0)), reviewCount: Math.max(0, Number(x.reviewCount) || 0), reviewedAt: Number.isFinite(x.reviewedAt) ? x.reviewedAt : null, deletedAt: Number.isFinite(x.deletedAt) && x.deletedAt > 0 ? x.deletedAt : null };
+    const correctAnswerPhotos = x.correctAnswerPhotos ?? [];
+    if (!Array.isArray(correctAnswerPhotos) || correctAnswerPhotos.length > 8 || correctAnswerPhotos.some(p => typeof p !== 'string' || !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(p) || p.length > 16000000)) throw new Error('备份图片格式不正确');
+    if (!x.title.trim() || (!x.photos.length && !(x.question ?? '').trim())) throw new Error('备份题目缺少内容');
+    return { id: x.id, subject: x.subject, title: x.title, question: x.question ?? '', answer: x.answer ?? '', correctAnswer: x.correctAnswer ?? '', correctAnswerPhotos, reason: x.reason ?? '', tags: x.tags ?? '', photos: x.photos, createdAt: x.createdAt, updatedAt: x.updatedAt, nextReview: x.nextReview, mastered: x.mastered === true, starred: x.starred === true, level: Math.max(0, Math.min(5, Number(x.level) || 0)), reviewCount: Math.max(0, Number(x.reviewCount) || 0), reviewedAt: Number.isFinite(x.reviewedAt) ? x.reviewedAt : null, deletedAt: Number.isFinite(x.deletedAt) && x.deletedAt > 0 ? x.deletedAt : null };
   });
 }

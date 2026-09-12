@@ -28,7 +28,7 @@ export async function browserImage(source) {
   return { data: Uint8Array.from(atob(source.slice(source.indexOf(',') + 1)), char => char.charCodeAt(0)), type, width: image.naturalWidth, height: image.naturalHeight };
 }
 
-export async function buildQuestionDocument(records, { title = '我的错题', includeAnswers = true, pagePerQuestion = false } = {}, imageLoader = browserImage) {
+export async function buildQuestionDocument(records, { title = '我的错题', includeAnswers = false, pagePerQuestion = false } = {}, imageLoader = browserImage) {
   if (!records.length) throw new Error('请先选择需要导出的题目');
   title = cleanText(title).trim() || '我的错题';
   // Compact reference preset, with A4 paper and Chinese fonts for printed exercises.
@@ -44,14 +44,18 @@ export async function buildQuestionDocument(records, { title = '我的错题', i
     children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, numbering: { reference: 'questions', level: 0 }, pageBreakBefore: pagePerQuestion && index > 0, children: [new TextRun(cleanText(item.title))] }));
     const metadata = [`学科：${item.subject}`, ...(item.tags ? [`知识点：${item.tags}`] : [])];
     children.push(new Paragraph({ style: 'ExportMeta', keepNext: true, children: [new TextRun(cleanText(metadata.join('  |  ')))] }));
-    for (const [photoIndex, source] of item.photos.entries()) {
+    const addPhotos = async (photos, description) => { for (const [photoIndex, source] of (photos || []).entries()) {
       const image = await imageLoader(source);
       if (!(image.width > 0 && image.height > 0)) throw new Error(`第 ${index + 1} 题的照片尺寸无效`);
       const scale = Math.min(1, 600 / image.width, 520 / image.height);
-      children.push(new Paragraph({ spacing: { before: 80, after: 160, line: 240 }, children: [new ImageRun({ type: image.type, data: image.data, transformation: { width: Math.max(1, Math.round(image.width * scale)), height: Math.max(1, Math.round(image.height * scale)) }, altText: { title: cleanText(item.title), description: `第 ${index + 1} 题，第 ${photoIndex + 1} 张照片`, name: `question-${index + 1}-${photoIndex + 1}` } })] }));
-    }
+      children.push(new Paragraph({ spacing: { before: 80, after: 160, line: 240 }, children: [new ImageRun({ type: image.type, data: image.data, transformation: { width: Math.max(1, Math.round(image.width * scale)), height: Math.max(1, Math.round(image.height * scale)) }, altText: { title: cleanText(item.title), description: `第 ${index + 1} 题${description}第 ${photoIndex + 1} 张照片`, name: `${description === '答案' ? 'answer' : 'question'}-${index + 1}-${photoIndex + 1}` } })] }));
+    } };
+    await addPhotos(item.photos, '题目');
     if (item.question) children.push(...paragraphs(item.question));
-    if (includeAnswers && (item.answer || item.reason)) {
+    if (includeAnswers && (item.correctAnswer || (item.correctAnswerPhotos || []).length || item.answer || item.reason)) {
+      children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun('正确答案')] }));
+      await addPhotos(item.correctAnswerPhotos, '答案');
+      if (item.correctAnswer) children.push(...paragraphs(item.correctAnswer));
       children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun('答案与解析')] }));
       if (item.answer) children.push(...paragraphs(item.answer));
       if (item.reason) children.push(new Paragraph({ style: 'ExportMeta', children: [new TextRun(`错因：${cleanText(item.reason)}`)] }));

@@ -10,7 +10,7 @@ const icon = name => `<i data-lucide="${name}"></i>`;
 const icons = () => window.lucide?.createIcons();
 const date = time => new Date(time).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
 let db, items = [], page = 'notebook', subject = '全部', status = 'all', query = '', sort = 'newest';
-let editingId = null, photos = [], imageIndex = 0, workingImage = null, originalImage = null;
+let editingId = null, photos = [], answerPhotos = [], photoKind = 'question', imageIndex = 0, workingImage = null, originalImage = null;
 let detailId = null, reviewQueue = [], reviewIndex = 0, reviewAnswer = false, reviewActive = false;
 let busy = false, pendingInstall = null, toastTimer;
 const selectedIds = new Set();
@@ -58,7 +58,7 @@ function filteredItems() {
   if (status === 'mastered') list = list.filter(x => x.mastered);
   if (status === 'due') list = dueItems(list);
   const needle = query.trim().toLowerCase();
-  if (needle) list = list.filter(x => [x.title, x.question, x.answer, x.tags, x.reason, x.subject].join(' ').toLowerCase().includes(needle));
+  if (needle) list = list.filter(x => [x.title, x.question, x.answer, x.correctAnswer, x.tags, x.reason, x.subject].join(' ').toLowerCase().includes(needle));
   return list.sort((a, b) => sort === 'oldest' ? a.createdAt - b.createdAt : sort === 'review' ? a.nextReview - b.nextReview : b.createdAt - a.createdAt);
 }
 function renderCards() {
@@ -85,7 +85,7 @@ function notebook() {
   const all = active().filter(x => page !== 'starred' || x.starred);
   const subjects = ['全部', ...SUBJECTS.filter(x => ['数学', '语文', '英语'].includes(x) || all.some(y => y.subject === x))];
   $('#main').innerHTML = heading(page === 'starred' ? '我的重点题' : '我的错题本', page === 'starred' ? '再多想一遍，再记牢一点。' : '把每一次出错，变成下一次进步。') + (page === 'notebook' ? stats() : '') + (page === 'notebook' ? `<div class="review-strip"><div class="strip-icon">${icon('sun')}</div><div><strong>今日复习</strong><p>${dueItems(active()).length ? `还有 ${dueItems(active()).length} 道错题，等你再挑战一次` : '暂时没有待复习的题目'}</p></div><a class="text-button" href="#review">${dueItems(active()).length ? '去复习' : '复习计划'}${icon('arrow-right')}</a></div>` : '') + `<div class="section-heading"><h2>${page === 'starred' ? '重点收藏' : '全部错题'}</h2><span id="result-count"></span></div><div class="subject-tabs" role="group" aria-label="按学科筛选">${subjects.map(s => `<button class="subject-tab ${subject === s ? 'active' : ''}" data-action="subject" data-value="${s}" aria-pressed="${subject === s}">${s}<span class="tab-count">${s === '全部' ? all.length : all.filter(x => x.subject === s).length}</span></button>`).join('')}</div><div class="filterbar"><div class="search-wrap">${icon('search')}<input id="search" aria-label="搜索错题" placeholder="搜索题目、知识点或错因" value="${esc(query)}"></div><div class="spacer"></div><select id="status-filter" aria-label="掌握状态"><option value="all">全部状态</option><option value="pending">待巩固</option><option value="due">待复习</option><option value="mastered">已掌握</option></select><select id="sort-filter" aria-label="排序方式"><option value="newest">最近收集</option><option value="oldest">最早收集</option><option value="review">复习时间</option></select></div><div id="questions" class="questions"></div><p class="bottom-note">每一道错题，都值得被认真对待。</p>`;
-  $('#questions').insertAdjacentHTML('beforebegin', `<div class="selection-bar" aria-label="题目选择与导出"><label class="check-label"><input type="checkbox" id="select-visible">全选当前结果</label><span id="selection-count" aria-live="polite"></span><button id="clear-selection" class="icon-button" data-action="clear-selection" aria-label="清空选择" title="清空选择">${icon('list-x')}</button><button id="export-selected" class="secondary" data-action="export-selected" disabled>${icon('file-down')}导出 Word</button></div>`);
+  $('#questions').insertAdjacentHTML('beforebegin', `<div class="selection-bar" aria-label="题目选择与导出"><label class="check-label"><input type="checkbox" id="select-visible">全选当前结果</label><span id="selection-count" aria-live="polite"></span><button id="clear-selection" class="icon-button" data-action="clear-selection" aria-label="清空选择" title="清空选择">${icon('list-x')}</button><button id="export-selected" class="secondary" data-action="export-selected" disabled>${icon('file-down')}导出 Word</button><button id="export-by-date" class="secondary" data-action="export-by-date">${icon('calendar-days')}按日期导出</button></div>`);
   $('#status-filter').value = status; $('#sort-filter').value = sort;
   $('#search').addEventListener('input', event => { query = event.target.value; renderCards(); });
   $('#status-filter').addEventListener('change', event => { status = event.target.value; renderCards(); });
@@ -170,15 +170,20 @@ function openEditor(id = null) {
   const item = items.find(x => x.id === id);
   $('#entry-form').reset();
   $('#subject').value = item?.subject || (SUBJECTS.includes(subject) ? subject : '数学');
-  for (const field of ['title', 'question', 'answer', 'reason', 'tags']) $(`[name="${field}"]`).value = item?.[field] || '';
+  for (const field of ['title', 'question', 'answer', 'correctAnswer', 'reason', 'tags']) $(`[name="${field}"]`).value = item?.[field] || '';
   photos = [...(item?.photos || [])];
+  answerPhotos = [...(item?.correctAnswerPhotos || [])];
   $('#editor-title').textContent = item ? '编辑错题' : '收集错题';
   $('#editor-error').textContent = '';
-  renderPhotos(); $('#editor').showModal();
+  renderPhotos(); renderAnswerPhotos(); $('#editor').showModal();
 }
 function renderPhotos() {
   $('#photo-count').textContent = `${photos.length} / 8 张`;
   $('#photo-list').innerHTML = photos.map((src, index) => `<div class="photo-item"><button type="button" data-action="edit-image" data-index="${index}" aria-label="调整第 ${index + 1} 张照片"><img src="${src}" alt="第 ${index + 1} 张题目照片"><span class="edit-badge">${icon('crop')}</span></button><button type="button" class="icon-button" data-action="remove-photo" data-index="${index}" title="移除照片" aria-label="移除第 ${index + 1} 张照片">${icon('x')}</button></div>`).join(''); icons();
+}
+function renderAnswerPhotos() {
+  $('#answer-photo-count').textContent = `${answerPhotos.length} / 8 张`;
+  $('#answer-photo-list').innerHTML = answerPhotos.map((src, index) => `<div class="photo-item"><button type="button" data-action="edit-answer-image" data-index="${index}" aria-label="调整第 ${index + 1} 张答案照片"><img src="${src}" alt="第 ${index + 1} 张答案照片"><span class="edit-badge">${icon('crop')}</span></button><button type="button" class="icon-button" data-action="remove-answer-photo" data-index="${index}" title="移除照片" aria-label="移除第 ${index + 1} 张答案照片">${icon('x')}</button></div>`).join(''); icons();
 }
 function loadImage(src) { return new Promise((resolve, reject) => { const img = new Image(); img.onload = () => resolve(img); img.onerror = () => reject(new Error('无法读取图片，请转换为 JPG 或 PNG 后重试。')); img.src = src; }); }
 async function compress(file) {
@@ -193,12 +198,13 @@ async function compress(file) {
     return canvas.toDataURL('image/jpeg', .9);
   } finally { URL.revokeObjectURL(url); }
 }
-async function receivePhotos(event) {
+async function receivePhotos(event, kind = 'question') {
   const files = [...event.target.files]; event.target.value = '';
   if (!files.length || busy) return;
-  if (files.length + photos.length > 8) { $('#editor-error').textContent = '每道题最多保存 8 张照片。'; return; }
+  const target = kind === 'answer' ? answerPhotos : photos;
+  if (files.length + target.length > 8) { $('#editor-error').textContent = '每道题每类照片最多保存 8 张。'; return; }
   busy = true; $('#save-entry').disabled = true; $('#editor-error').textContent = '正在处理照片…';
-  try { const added = []; for (const file of files) added.push(await compress(file)); photos.push(...added); renderPhotos(); $('#editor-error').textContent = ''; }
+  try { const added = []; for (const file of files) added.push(await compress(file)); target.push(...added); kind === 'answer' ? renderAnswerPhotos() : renderPhotos(); $('#editor-error').textContent = ''; }
   catch (error) { $('#editor-error').textContent = error.message; }
   finally { busy = false; $('#save-entry').disabled = false; }
 }
@@ -209,7 +215,7 @@ async function saveEntry(event) {
   if (!photos.length && !question) { $('#editor-error').textContent = '请添加题目照片，或输入题目文字。'; return; }
   busy = true; $('#save-entry').disabled = true;
   const now = Date.now(), old = items.find(x => x.id === editingId);
-  const item = { ...(old || { id: crypto.randomUUID ? crypto.randomUUID() : `${now}-${Math.random().toString(36).slice(2)}`, createdAt: now, starred: false, mastered: false, level: 0, reviewCount: 0, reviewedAt: null, deletedAt: null, nextReview: now }), updatedAt: now, title: form.get('title').trim() || `${form.get('subject')}错题 · ${date(now)}`, subject: form.get('subject'), reason: form.get('reason'), question, answer: form.get('answer').trim(), tags: form.get('tags').trim(), photos: [...photos] };
+  const item = { ...(old || { id: crypto.randomUUID ? crypto.randomUUID() : `${now}-${Math.random().toString(36).slice(2)}`, createdAt: now, starred: false, mastered: false, level: 0, reviewCount: 0, reviewedAt: null, deletedAt: null, nextReview: now }), updatedAt: now, title: form.get('title').trim() || `${form.get('subject')}错题 · ${date(now)}`, subject: form.get('subject'), reason: form.get('reason'), question, answer: form.get('answer').trim(), correctAnswer: form.get('correctAnswer').trim(), tags: form.get('tags').trim(), photos: [...photos], correctAnswerPhotos: [...answerPhotos] };
   try { await putItems([item]); $('#editor').close(); render(); if ($('#detail').open) showDetail(item.id); toast('错题已保存'); navigator.storage?.persist?.().catch(() => {}); }
   catch (error) { $('#editor-error').textContent = storageError(error); }
   finally { busy = false; $('#save-entry').disabled = false; }
@@ -218,7 +224,8 @@ function questionContent(item) {
   return item.photos.map((src, index) => `<button class="detail-photo" data-action="full-image" data-id="${esc(item.id)}" data-index="${index}" aria-label="放大第 ${index + 1} 张题目照片"><img src="${src}" alt="第 ${index + 1} 张题目照片"></button>`).join('') + (item.question ? `<p class="text-block">${esc(item.question)}</p>` : '');
 }
 function answerContent(item) {
-  return `<section class="answer-block"><h3>答案与解析</h3><p class="text-block">${esc(item.answer || '暂未记录解析')}</p>${item.reason ? `<span class="badge warm">错因 · ${esc(item.reason)}</span>` : ''}</section>`;
+  const answerPhotosMarkup = (item.correctAnswerPhotos || []).map((src, index) => `<button class="detail-photo" data-action="full-answer-image" data-id="${esc(item.id)}" data-index="${index}" aria-label="放大第 ${index + 1} 张答案照片"><img src="${src}" alt="第 ${index + 1} 张答案照片"></button>`).join('');
+  return `<section class="answer-block"><h3>正确答案</h3>${answerPhotosMarkup}${item.correctAnswer ? `<p class="text-block">${esc(item.correctAnswer)}</p>` : ''}<h3>答案与解析</h3><p class="text-block">${esc(item.answer || '暂未记录解析')}</p>${item.reason ? `<span class="badge warm">错因 · ${esc(item.reason)}</span>` : ''}</section>`;
 }
 function showDetail(id) {
   const item = items.find(x => x.id === id); if (!item) return;
@@ -236,7 +243,7 @@ function drawCrop() {
   const x = b.left * w, y = b.top * h, width = (b.right - b.left) * w, height = (b.bottom - b.top) * h;
   ctx.drawImage(workingImage, x, y, width, height, x, y, width, height); ctx.strokeStyle = '#5fc99a'; ctx.lineWidth = Math.max(2, w / 300); ctx.strokeRect(x, y, width, height);
 }
-async function editImage(index) { imageIndex = index; originalImage = photos[index]; workingImage = await loadImage(originalImage); resetCrop(); drawCrop(); $('#image-editor').showModal(); }
+async function editImage(index, kind = 'question') { photoKind = kind; imageIndex = index; const list = kind === 'answer' ? answerPhotos : photos; originalImage = list[index]; workingImage = await loadImage(originalImage); resetCrop(); drawCrop(); $('#image-editor').showModal(); }
 async function rotateImage() {
   const canvas = document.createElement('canvas'); canvas.width = workingImage.naturalHeight; canvas.height = workingImage.naturalWidth;
   const ctx = canvas.getContext('2d'); ctx.translate(canvas.width, 0); ctx.rotate(Math.PI / 2); ctx.drawImage(workingImage, 0, 0);
@@ -246,7 +253,8 @@ function applyCrop() {
   const b = bounds(), w = workingImage.naturalWidth, h = workingImage.naturalHeight;
   const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round((b.right - b.left) * w)); canvas.height = Math.max(1, Math.round((b.bottom - b.top) * h));
   canvas.getContext('2d').drawImage(workingImage, b.left * w, b.top * h, (b.right - b.left) * w, (b.bottom - b.top) * h, 0, 0, canvas.width, canvas.height);
-  photos[imageIndex] = canvas.toDataURL('image/jpeg', .93); renderPhotos(); $('#image-editor').close();
+  const list = photoKind === 'answer' ? answerPhotos : photos;
+  list[imageIndex] = canvas.toDataURL('image/jpeg', .93); photoKind === 'answer' ? renderAnswerPhotos() : renderPhotos(); $('#image-editor').close();
 }
 function exportBackup() {
   const file = new Blob([JSON.stringify({ app: 'shiti', version: 1, exportedAt: Date.now(), items })], { type: 'application/json' });
@@ -268,8 +276,36 @@ async function openDocumentExport() {
   invalidateDocument();
   $('#document-count').textContent = `${exportRecords.length} 道题目 · ${exportRecords.reduce((sum, x) => sum + x.photos.length, 0)} 张照片`;
   $('#document-form').reset();
+  $('#collection-date-range').hidden = true;
   $('#document-options').disabled = false; $('#generate-document').disabled = false;
   $('#document-export').showModal();
+}
+async function openDateDocumentExport() {
+  invalidateDocument();
+  $('#document-form').reset();
+  $('#document-form input[value="date"]').checked = true;
+  $('#collection-date-range').hidden = false;
+  await refreshExportScope();
+  $('#document-options').disabled = false; $('#generate-document').disabled = exportRecords.length === 0;
+  $('#document-export').showModal();
+}
+async function refreshExportScope() {
+  const scope = document.querySelector('input[name="export-scope"]:checked')?.value || 'selected';
+  if (scope === 'selected') {
+    const { selectedQuestions } = await import('./document-export.js');
+    exportRecords = selectedQuestions(items, selectedIds, sort);
+  } else {
+    const from = $('#collection-date-from').value;
+    const to = $('#collection-date-to').value;
+    const fromTime = from ? new Date(`${from}T00:00:00`).getTime() : -Infinity;
+    const toTime = to ? new Date(`${to}T23:59:59.999`).getTime() : Infinity;
+    exportRecords = fromTime > toTime ? [] : active().filter(item => item.createdAt >= fromTime && item.createdAt <= toTime).sort((a, b) => sort === 'oldest' ? a.createdAt - b.createdAt : sort === 'review' ? a.nextReview - b.nextReview : b.createdAt - a.createdAt);
+  }
+  $('#collection-date-range').hidden = scope !== 'date';
+  $('#document-count').textContent = `${exportRecords.length} 道题目 · ${exportRecords.reduce((sum, x) => sum + x.photos.length, 0)} 张照片`;
+  $('#generate-document').disabled = exportRecords.length === 0;
+  if (!exportRecords.length) $('#document-status').textContent = scope === 'date' ? (from && to && fromTime > toTime ? '开始日期不能晚于结束日期' : '该日期范围内没有错题') : '请先在错题本中选择题目';
+  else $('#document-status').textContent = '';
 }
 async function generateDocument(event) {
   event.preventDefault();
@@ -315,6 +351,7 @@ async function action(event) {
   if (action.startsWith('sync-')) return syncAction(action, id);
   if (action === 'clear-selection') { selectedIds.clear(); return syncSelection(); }
   if (action === 'export-selected') return openDocumentExport();
+  if (action === 'export-by-date') return openDateDocumentExport();
   if (action === 'close-document') return $('#document-export').close();
   if (action === 'share-document') {
     if (documentFile && navigator.share) {
@@ -325,6 +362,7 @@ async function action(event) {
   }
   if (action === 'new') return openEditor();
   if (action === 'camera' || action === 'album') return $(`#${action}-input`).click();
+  if (action === 'answer-camera' || action === 'answer-album') return $(`#${action}-input`).click();
   if (action === 'close-editor') return $('#editor').close();
   if (action === 'close-detail') return $('#detail').close();
   if (action === 'close-image') return $('#image-editor').close();
@@ -334,11 +372,14 @@ async function action(event) {
   if (action === 'detail') return showDetail(id);
   if (action === 'edit') return openEditor(id);
   if (action === 'remove-photo') { photos.splice(index, 1); return renderPhotos(); }
+  if (action === 'remove-answer-photo') { answerPhotos.splice(index, 1); return renderAnswerPhotos(); }
   if (action === 'edit-image') return editImage(index);
+  if (action === 'edit-answer-image') return editImage(index, 'answer');
   if (action === 'rotate') return rotateImage();
   if (action === 'reset-crop') { workingImage = await loadImage(originalImage); resetCrop(); return drawCrop(); }
   if (action === 'apply-crop') return applyCrop();
   if (action === 'full-image') { $('#full-image').src = items.find(x => x.id === id).photos[index]; return $('#lightbox').showModal(); }
+  if (action === 'full-answer-image') { $('#full-image').src = (items.find(x => x.id === id).correctAnswerPhotos || [])[index]; return $('#lightbox').showModal(); }
   if (action === 'export') return exportBackup();
   if (action === 'import') return $('#import-input').click();
   if (action === 'install') { if (pendingInstall) { await pendingInstall.prompt(); pendingInstall = null; render(); } return; }
@@ -367,7 +408,8 @@ async function action(event) {
 $('#subject').innerHTML = SUBJECTS.map(x => `<option>${x}</option>`).join('');
 $('#reason').insertAdjacentHTML('beforeend', REASONS.map(x => `<option>${x}</option>`).join(''));
 $('#today').textContent = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
-$('#camera-input').addEventListener('change', receivePhotos); $('#album-input').addEventListener('change', receivePhotos);
+$('#camera-input').addEventListener('change', event => receivePhotos(event, 'question')); $('#album-input').addEventListener('change', event => receivePhotos(event, 'question'));
+$('#answer-camera-input').addEventListener('change', event => receivePhotos(event, 'answer')); $('#answer-album-input').addEventListener('change', event => receivePhotos(event, 'answer'));
 $('#import-input').addEventListener('change', importBackup); $('#entry-form').addEventListener('submit', saveEntry);
 document.addEventListener('click', event => { action(event).catch(error => toast(error.message || '操作失败，请重试')); });
 document.addEventListener('submit', async event => {
@@ -396,6 +438,8 @@ document.addEventListener('change', event => {
 });
 $('#document-form').addEventListener('submit', generateDocument);
 $('#document-options').addEventListener('input', invalidateDocument);
+document.querySelectorAll('input[name="export-scope"]').forEach(input => input.addEventListener('change', () => { invalidateDocument(); refreshExportScope(); }));
+$('#collection-date-from').addEventListener('input', () => { invalidateDocument(); refreshExportScope(); }); $('#collection-date-to').addEventListener('input', () => { invalidateDocument(); refreshExportScope(); });
 $('#document-export').addEventListener('close', invalidateDocument);
 for (const edge of ['top', 'bottom', 'left', 'right']) $(`#crop-${edge}`).addEventListener('input', () => {
   const opposing = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' }[edge];
@@ -408,7 +452,7 @@ window.addEventListener('beforeinstallprompt', event => { event.preventDefault()
 window.addEventListener('appinstalled', () => { pendingInstall = null; if (page === 'settings' && db) render(); });
 const network = () => { $('#network-label').textContent = navigator.onLine ? '· 已连接' : '· 离线'; };
 window.addEventListener('online', network); window.addEventListener('offline', network); network();
-window.addEventListener('beforeunload', event => { if ($('#editor').open && (photos.length || $('#question').value || $('#entry-title').value)) event.preventDefault(); });
+window.addEventListener('beforeunload', event => { if ($('#editor').open && (photos.length || answerPhotos.length || $('#question').value || $('#correct-answer').value || $('#entry-title').value)) event.preventDefault(); });
 window.addEventListener('storage-blocked', () => { $('#main').innerHTML = heading('正在更新本机存储', '请关闭其他已打开的拾题页面，更新会自动继续。', false); });
 try {
   db = await openDB(); items = await readItems();

@@ -23,6 +23,10 @@
 .question-card.is-selected{border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
 .question-card:has(.card-selection) .text-preview{padding-top:50px}
 #document-options{border:0;padding:0;margin:0;min-width:0}
+#document-scope{border:0;padding:0;margin:0 0 22px;min-width:0}
+#document-scope legend{font-size:13px;color:#58685e;margin-bottom:10px}
+#document-scope .check-label{margin:10px 0}
+#document-scope input[type=radio]{width:18px;height:18px;min-width:18px;padding:0;accent-color:var(--green);cursor:pointer}
 #document-options .check-label{margin:10px 0}
 .export-count{color:var(--muted);font-size:13px;margin-bottom:22px}
 .export-status{min-height:24px;font-size:12px;line-height:1.8;color:var(--green);margin-top:18px;overflow-wrap:anywhere}
@@ -33,6 +37,7 @@
   .selection-bar .check-label{font-size:11px}
   #selection-count{font-size:11px}
   #export-selected{width:100%;min-height:42px}
+  #export-by-date{width:100%;min-height:42px}
   .export-sheet .check-label{font-size:14px}
 }
 @media(max-width:700px){

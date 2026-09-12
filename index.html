@@ -37,6 +37,9 @@
         <label>题目名称<input id="entry-title" name="title" maxlength="120" placeholder="例如：一元二次方程的应用"></label>
         <label>题目文字<textarea id="question" name="question" rows="3" maxlength="20000" placeholder="选填，或直接输入题目"></textarea></label>
         <label>答案与解析<textarea id="answer" name="answer" rows="4" maxlength="20000" placeholder="记录正确解法和容易出错的地方"></textarea></label>
+        <label>正确答案<textarea id="correct-answer" name="correctAnswer" rows="3" maxlength="20000" placeholder="可输入最终答案，也可以拍照上传"></textarea></label>
+        <div class="photo-actions answer-photo-actions"><button type="button" class="primary" data-action="answer-camera"><i data-lucide="camera"></i>拍摄答案</button><button type="button" class="secondary" data-action="answer-album"><i data-lucide="images"></i>从相册选择</button><span id="answer-photo-count">0 / 8 张</span></div>
+        <div id="answer-photo-list" class="photo-list answer-photo-list"></div>
         <label>知识点<input id="tags" name="tags" maxlength="200" placeholder="例如：方程，应用题"></label>
         <p class="form-error" id="editor-error" role="alert"></p>
       </div>
@@ -49,9 +52,18 @@
       <div class="dialog-head"><h2 id="document-heading">导出 Word 文档</h2><button type="button" class="icon-button" data-action="close-document" aria-label="关闭文档导出" title="关闭"><i data-lucide="x"></i></button></div>
       <div class="dialog-body">
         <p id="document-count" class="export-count"></p>
+        <fieldset id="document-scope">
+          <legend>导出范围</legend>
+          <label class="check-label"><input type="radio" name="export-scope" value="selected" checked>已选择的题目</label>
+          <label class="check-label"><input type="radio" name="export-scope" value="date">按收集日期</label>
+          <div id="collection-date-range" class="form-grid" hidden>
+            <label>开始日期<input id="collection-date-from" type="date"></label>
+            <label>结束日期<input id="collection-date-to" type="date"></label>
+          </div>
+        </fieldset>
         <fieldset id="document-options">
           <label>文档标题<input id="document-title" value="我的错题" maxlength="80" required></label>
-          <label class="check-label"><input id="include-answers" type="checkbox" checked>包含答案与解析</label>
+          <label class="check-label"><input id="include-answers" type="checkbox">包含答案与解析</label>
           <label class="check-label"><input id="page-per-question" type="checkbox">每题另起一页</label>
         </fieldset>
         <p id="document-status" class="export-status" role="status" aria-live="polite"></p>
@@ -72,6 +84,8 @@
   <dialog id="lightbox" aria-label="查看题目原图"><button class="icon-button" data-action="close-lightbox" aria-label="关闭原图" title="关闭"><i data-lucide="x"></i></button><img id="full-image" alt="题目原图"></dialog>
   <input id="camera-input" type="file" accept="image/*" capture="environment" hidden>
   <input id="album-input" type="file" accept="image/*" multiple hidden>
+  <input id="answer-camera-input" type="file" accept="image/*" capture="environment" hidden>
+  <input id="answer-album-input" type="file" accept="image/*" multiple hidden>
   <input id="import-input" type="file" accept=".json,application/json" hidden>
   <div id="toast" class="toast" role="status"></div>
   <noscript>请启用 JavaScript 后使用错题本。</noscript>
