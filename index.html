@@ -1,10 +1,79 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <title>我的网站</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#246b56">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="拾题">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="description" content="拾题 · 我的错题本">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <title>拾题 · 我的错题本</title>
+  <script defer src="vendor/lucide.js"></script>
+  <script type="module" src="app.js"></script>
 </head>
 <body>
-  <h1>网站已上线</h1>
+  <aside class="sidebar">
+    <a href="#notebook" class="brand"><img src="assets/icon-192.png" alt="" width="38" height="38"><span>拾题<small>我的错题本</small></span></a>
+    <nav aria-label="主导航" id="desktop-nav"></nav>
+    <div class="side-footer"><span class="status-dot"></span> 本机保存 <span id="network-label">· 已连接</span></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><span class="breadcrumb">学习空间 <span>/</span> <strong id="page-name">错题本</strong></span><span class="today" id="today"></span><a href="#settings" class="avatar" aria-label="数据与设置"><i data-lucide="user-round"></i></a></header>
+    <main id="main" tabindex="-1"></main>
+  </div>
+  <nav class="mobile-nav" aria-label="底部导航" id="mobile-nav"></nav>
+  <dialog id="editor" class="sheet" aria-labelledby="editor-title">
+    <form id="entry-form">
+      <div class="dialog-head"><h2 id="editor-title">收集错题</h2><button type="button" class="icon-button" data-action="close-editor" aria-label="关闭" title="关闭"><i data-lucide="x"></i></button></div>
+      <div class="dialog-body">
+        <div class="photo-actions"><button type="button" class="primary" data-action="camera"><i data-lucide="camera"></i>拍照</button><button type="button" class="secondary" data-action="album"><i data-lucide="images"></i>从相册选择</button><span id="photo-count">0 / 8 张</span></div>
+        <div id="photo-list" class="photo-list"></div>
+        <div class="form-grid"><label>学科<select id="subject" name="subject"></select></label><label>错因<select id="reason" name="reason"><option value="">暂未整理</option></select></label></div>
+        <label>题目名称<input id="entry-title" name="title" maxlength="120" placeholder="例如：一元二次方程的应用"></label>
+        <label>题目文字<textarea id="question" name="question" rows="3" maxlength="20000" placeholder="选填，或直接输入题目"></textarea></label>
+        <label>答案与解析<textarea id="answer" name="answer" rows="4" maxlength="20000" placeholder="记录正确解法和容易出错的地方"></textarea></label>
+        <label>知识点<input id="tags" name="tags" maxlength="200" placeholder="例如：方程，应用题"></label>
+        <p class="form-error" id="editor-error" role="alert"></p>
+      </div>
+      <div class="dialog-footer"><button class="secondary" type="button" data-action="close-editor">取消</button><button class="primary" type="submit" id="save-entry"><i data-lucide="check"></i>保存错题</button></div>
+    </form>
+  </dialog>
+  <dialog id="detail" class="sheet detail-sheet" aria-label="错题详情"></dialog>
+  <dialog id="document-export" class="sheet export-sheet" aria-labelledby="document-heading">
+    <form id="document-form">
+      <div class="dialog-head"><h2 id="document-heading">导出 Word 文档</h2><button type="button" class="icon-button" data-action="close-document" aria-label="关闭文档导出" title="关闭"><i data-lucide="x"></i></button></div>
+      <div class="dialog-body">
+        <p id="document-count" class="export-count"></p>
+        <fieldset id="document-options">
+          <label>文档标题<input id="document-title" value="我的错题" maxlength="80" required></label>
+          <label class="check-label"><input id="include-answers" type="checkbox" checked>包含答案与解析</label>
+          <label class="check-label"><input id="page-per-question" type="checkbox">每题另起一页</label>
+        </fieldset>
+        <p id="document-status" class="export-status" role="status" aria-live="polite"></p>
+        <div id="document-result" class="document-result" hidden>
+          <a id="document-download" class="primary"><i data-lucide="download"></i>下载 Word 文档</a>
+          <button type="button" id="document-share" class="secondary" data-action="share-document" hidden><i data-lucide="share-2"></i>分享</button>
+        </div>
+      </div>
+      <div class="dialog-footer"><button type="button" class="secondary" data-action="close-document">关闭</button><button type="submit" id="generate-document" class="primary"><i data-lucide="file-text"></i>生成文档</button></div>
+    </form>
+  </dialog>
+  <dialog id="image-editor" class="sheet image-sheet" aria-labelledby="image-title">
+    <div class="dialog-head"><h2 id="image-title">调整照片</h2><button class="icon-button" data-action="close-image" aria-label="关闭图片编辑" title="关闭"><i data-lucide="x"></i></button></div>
+    <div class="image-workspace"><canvas id="crop-canvas" aria-label="题目图片裁剪预览"></canvas></div>
+    <div class="crop-controls"><label>上边界<input id="crop-top" type="range" min="0" max="90" value="0"></label><label>下边界<input id="crop-bottom" type="range" min="10" max="100" value="100"></label><label>左边界<input id="crop-left" type="range" min="0" max="90" value="0"></label><label>右边界<input id="crop-right" type="range" min="10" max="100" value="100"></label></div>
+    <div class="dialog-footer"><button class="icon-button" data-action="rotate" aria-label="向右旋转90度" title="向右旋转90度"><i data-lucide="rotate-cw"></i></button><button class="secondary" data-action="reset-crop"><i data-lucide="undo-2"></i>重置</button><button class="primary" data-action="apply-crop"><i data-lucide="check"></i>完成</button></div>
+  </dialog>
+  <dialog id="lightbox" aria-label="查看题目原图"><button class="icon-button" data-action="close-lightbox" aria-label="关闭原图" title="关闭"><i data-lucide="x"></i></button><img id="full-image" alt="题目原图"></dialog>
+  <input id="camera-input" type="file" accept="image/*" capture="environment" hidden>
+  <input id="album-input" type="file" accept="image/*" multiple hidden>
+  <input id="import-input" type="file" accept=".json,application/json" hidden>
+  <div id="toast" class="toast" role="status"></div>
+  <noscript>请启用 JavaScript 后使用错题本。</noscript>
 </body>
 </html>
